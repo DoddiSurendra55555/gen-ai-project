@@ -7,7 +7,7 @@ export default function HistoryDashboard({ token, onStartNew, onResume }) {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const res = await fetch('https://gen-ai-project-1-ldr9.onrender.com/sessions/history', {
+        const res = await fetch('https://gen-ai-project-3-5eim.onrender.com/sessions/history', {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
