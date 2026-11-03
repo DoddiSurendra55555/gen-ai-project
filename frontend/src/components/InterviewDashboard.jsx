@@ -49,7 +49,7 @@ export default function InterviewDashboard({ token, resumeSessionId, onComplete 
       const loadSession = async () => {
         setLoading(true);
         try {
-          const res = await fetch(`http://127.0.0.1:8000/sessions/${resumeSessionId}`, {
+          const res = await fetch(`https://gen-ai-project-1-ldr9.onrender.com/sessions/${resumeSessionId}`, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
           if (!res.ok) throw new Error('Failed to load session');
@@ -91,7 +91,7 @@ export default function InterviewDashboard({ token, resumeSessionId, onComplete 
     setEndReason('time_up');
     window.speechSynthesis.cancel(); 
     try {
-      await fetch(`http://127.0.0.1:8000/sessions/${sessionId}/complete`, {
+      await fetch(`https://gen-ai-project-1-ldr9.onrender.com/sessions/${sessionId}/complete`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -107,7 +107,7 @@ export default function InterviewDashboard({ token, resumeSessionId, onComplete 
     setEndReason('manual');
     window.speechSynthesis.cancel(); 
     try {
-      await fetch(`http://127.0.0.1:8000/sessions/${sessionId}/complete`, {
+      await fetch(`https://gen-ai-project-1-ldr9.onrender.com/sessions/${sessionId}/complete`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -143,7 +143,7 @@ export default function InterviewDashboard({ token, resumeSessionId, onComplete 
     setLoading(true);
     setError(null);
     try {
-      const questionRes = await fetch('http://127.0.0.1:8000/generate-questions', {
+      const questionRes = await fetch('https://gen-ai-project-1-ldr9.onrender.com/generate-questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ role, mode, experience, difficulty }) 
@@ -151,7 +151,7 @@ export default function InterviewDashboard({ token, resumeSessionId, onComplete 
       if (!questionRes.ok) throw new Error('Failed to generate questions. Did you upload a resume in your profile?');
       const questionData = await questionRes.json();
       
-      const sessionRes = await fetch('http://127.0.0.1:8000/sessions', {
+      const sessionRes = await fetch('https://gen-ai-project-1-ldr9.onrender.com/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ 
@@ -178,7 +178,7 @@ export default function InterviewDashboard({ token, resumeSessionId, onComplete 
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('http://127.0.0.1:8000/sessions/evaluate', {
+      const res = await fetch('https://gen-ai-project-1-ldr9.onrender.com/sessions/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

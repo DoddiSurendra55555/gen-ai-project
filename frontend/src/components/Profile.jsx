@@ -10,7 +10,7 @@ export default function Profile({ token }) {
     setLoading(true);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/profile', {
+      const res = await fetch('https://gen-ai-project-1-ldr9.onrender.com/profile', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) setProfile(await res.json());
@@ -28,7 +28,7 @@ export default function Profile({ token }) {
       setLoading(true);
 
       try {
-        const res = await fetch('http://127.0.0.1:8000/profile', {
+        const res = await fetch('https://gen-ai-project-1-ldr9.onrender.com/profile', {
           headers: { Authorization: `Bearer ${token}` }
         });
 
@@ -57,7 +57,7 @@ export default function Profile({ token }) {
     formData.append('resume', file);
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/profile/resume', {
+      const res = await fetch('https://gen-ai-project-1-ldr9.onrender.com/profile/resume', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
