@@ -1,74 +1,69 @@
-# 🎯 AI Interview Coach
+# AI Interview Coach
 
-**Practice Better. Perform Confidently.**
+An AI-powered interview preparation platform that helps students and job seekers improve their interview skills through resume analysis, personalized mock interviews, voice-based interaction, and AI-generated performance feedback.
 
-AI Interview Coach is an AI-powered interview preparation platform that helps students and job seekers prepare for interviews using their own resumes. It analyzes uploaded resumes, generates personalized interview questions, evaluates answers, and provides a final performance report using Google's Gemini API.
+## Project Overview
 
-## 📌 Project Information
+AI Interview Coach uses Google's Gemini AI to analyze resumes, generate personalized interview questions, evaluate candidate answers, and create detailed interview performance reports.
 
-| Detail | Information |
-|---|---|
-| Project Name | AI Interview Coach |
-| Institution | Kalasalingam Academy of Research and Education |
-| Project ID | PRJ011 |
-| Team ID | T011 |
-| Project Guide | Mr. SHIRWIN PRINCE I |
-| Main Framework | Streamlit |
-| Programming Language | Python |
-| AI Model Provider | Google Gemini |
+The application is built using Python and Streamlit, with an interactive web interface.
 
-## ✨ Features
+## Features
 
 ### 1. Resume Analysis
 - Upload a resume in PDF format.
-- Extract resume text using PyMuPDF.
-- Validate PDF files and enforce a 5 MB upload limit.
-- Analyze skills, education, experience, strengths, and improvement areas using Gemini.
+- Extract resume text automatically.
+- Analyze candidate information using Gemini AI.
+- Identify technical skills, programming languages, education, projects, and work experience.
+- Display strengths, weaknesses, missing skills, and improvement suggestions.
 
-### 2. Personalized Interview Setup
-- Select your target job role.
-- Choose an interview type:
+### 2. Interview Setup
+- Select the desired job role.
+- Choose the interview type:
   - Technical
   - Behavioral
   - Mixed
-- Select difficulty:
+- Select the difficulty level:
   - Easy
   - Medium
   - Hard
-- Generate between 1 and 15 personalized interview questions.
+- Generate personalized interview questions based on resume information.
 
 ### 3. Mock Interview
-- Answer generated questions one at a time.
-- Submit answers for AI-powered evaluation.
-- Receive a score out of 100.
-- Get feedback, strengths, areas for improvement, and an example of a stronger answer.
+- Answer AI-generated interview questions.
+- Listen to questions using browser text-to-speech.
+- Speak answers using browser speech recognition.
+- View and edit speech-to-text transcription.
+- Submit answers for AI evaluation.
+- Receive feedback and suggestions for improvement.
 
 ### 4. Interview Results
 - View individual answer scores.
-- Check overall interview performance.
-- Visualize results using Plotly charts.
-- Receive AI-generated final feedback and recommendations.
-- Download the interview report in JSON format.
+- Review strengths and areas for improvement.
+- Receive an overall interview performance score.
+- Generate a final AI-powered performance report.
+- View performance charts.
+- Download the interview report.
 
 ### 5. Session Management
-- Store interview information temporarily using Streamlit Session State.
-- Clear application data using the Clear All option.
-- No project database is required.
+- Maintain interview progress during the browser session.
+- Recover supported session data after refreshing the browser.
+- Clear interview data using the Clear All option.
 
-## 🛠️ Technology Stack
+## Technologies Used
 
 | Technology | Purpose |
 |---|---|
 | Python | Main programming language |
-| Streamlit | Web application framework and user interface |
-| Google Gemini API | Resume analysis, question generation, and answer evaluation |
-| google-genai | Gemini API integration |
+| Streamlit | Web application framework |
+| Google Gemini API | AI-powered analysis and evaluation |
 | PyMuPDF | PDF text extraction |
-| Plotly | Performance charts and visualizations |
-| python-dotenv | Local environment variable management |
-| pytest | Automated testing |
+| Plotly | Interactive charts |
+| HTML, CSS, JavaScript | Interface styling and browser components |
+| Web Speech API | Speech recognition and text-to-speech |
+| Pytest | Unit testing |
 
-## 📁 Project Structure
+## Project Structure
 
 ```text
 AI-Interview-Coach/
@@ -83,182 +78,155 @@ AI-Interview-Coach/
 │
 ├── utils/
 │   ├── ai_engine.py
+│   ├── browser_storage.py
+│   ├── browser_voice.py
+│   ├── helpers.py
 │   ├── resume_parser.py
-│   └── helpers.py
+│   └── voice_engine.py
+│
+├── browser_storage_component/
+│   └── index.html
+│
+├── browser_voice_component/
+│   └── index.html
+│
+├── documentation/
+│   └── AI Interview Coach Documentation (1) (1).pdf
 │
 ├── tests/
-│   ├── test_resume_parser.py
-│   └── test_helpers.py
+│   ├── test_helpers.py
+│   └── test_resume_parser.py
 │
 ├── .streamlit/
 │   └── config.toml
 │
 ├── .env
-├── .env.example
 ├── .gitignore
 ├── requirements.txt
 └── README.md
 ```
 
-## ⚙️ Installation and Setup
-
-### Prerequisites
-
-Install the following before running the application:
+## Requirements
 
 - Python 3.10 or later
-- pip (Python package installer)
 - Google Gemini API key
-- Visual Studio Code (recommended)
+- Internet connection
+- Modern web browser (Google Chrome or Microsoft Edge recommended)
 
-### Step 1: Clone the Repository
+## Installation and Setup
 
-```bash
-git clone https://github.com/YOUR_USERNAME/ai-interview-coach.git
-```
-
-Navigate into the project directory:
+### 1. Clone the Repository
 
 ```bash
-cd ai-interview-coach
+git clone YOUR_GITHUB_REPOSITORY_URL
 ```
 
-### Step 2: Install Dependencies
+### 2. Open the Project Folder
 
 ```bash
-python -m pip install -r requirements.txt
+cd YOUR_PROJECT_FOLDER
 ```
 
-### Step 3: Configure the Gemini API Key
+### 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configure the Gemini API Key
 
 Create a `.env` file in the project root directory.
 
-Add your Gemini API key:
+Add:
 
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
-Get an API key from:
+Replace the placeholder with your own Gemini API key.
 
-https://aistudio.google.com/apikey
+**Important:** Never upload your `.env` file or expose your API key publicly.
 
-**Important:** Never upload your actual `.env` file or API key to GitHub.
-
-### Step 4: Run the Application
-
-Execute:
+### 5. Run the Application
 
 ```bash
 python -m streamlit run app.py
 ```
 
-Open the local application in your browser:
+The application will open in your browser.
 
-http://localhost:8501
+## Google Gemini API
 
-## 🚀 Application Workflow
+The project uses the Google Gemini API for:
 
-1. Open the AI Interview Coach homepage.
-2. Navigate to Resume Analysis.
-3. Upload your PDF resume.
-4. Click Analyze My Resume.
-5. Review the AI-generated resume analysis.
-6. Open Interview Setup.
-7. Select your job role, interview type, difficulty, and number of questions.
-8. Generate personalized interview questions.
-9. Start the Mock Interview.
-10. Submit answers to each question.
-11. Receive AI-generated evaluation and feedback.
-12. Open Interview Results to view your performance report.
-13. Download your report as a JSON file.
+- Resume analysis
+- Personalized interview question generation
+- Candidate answer evaluation
+- Final interview performance reports
 
-## 🧪 Testing
+The configured model is:
 
-The project uses pytest for automated testing.
+`gemini-3.1-flash-lite`
 
-Run all tests:
+A valid Gemini API key is required for AI-powered features.
+
+## Running Tests
+
+Run the unit tests using:
 
 ```bash
 python -m pytest tests -v
 ```
 
-Check Python syntax:
+## Deployment
 
-```bash
-python -m compileall -q app.py pages utils tests
-```
+The application can be deployed using **Streamlit Community Cloud**.
 
-Check installed dependencies:
+Deployment steps:
 
-```bash
-python -m pip check
-```
+1. Push the project to a GitHub repository.
+2. Log in to Streamlit Community Cloud.
+3. Create a new application.
+4. Select the GitHub repository and `app.py` as the main file.
+5. Open the application's Advanced Settings and add the Gemini API key under Secrets.
 
-The resume parser tests cover:
-
-- Valid PDF text extraction.
-- Empty PDF upload.
-- Invalid PDF file.
-- PDF files exceeding the 5 MB limit.
-- PDF files without readable selectable text.
-
-## 🔒 Privacy and Data Handling
-
-- Resume and interview data are maintained temporarily using Streamlit Session State.
-- The project does not use a database for permanent storage.
-- Users can clear temporary application data using Clear All.
-- Resume content and interview answers may be sent to Google's Gemini API when AI features are used.
-- The Gemini API key must be kept private and must not be committed to a public repository.
-
-**Note:** Scanned PDFs containing only images are not currently supported because OCR functionality has not been implemented.
-
-## ☁️ Deployment
-
-The application can be deployed using Streamlit Community Cloud.
-
-1. Push the project source code to a GitHub repository.
-2. Visit https://share.streamlit.io/
-3. Sign in using GitHub.
-4. Select Create app.
-5. Choose the project repository and `main` branch.
-6. Set the main file path to `app.py`.
-7. Add the Gemini API key under the application's Secrets settings.
-8. Deploy the application.
-
-For hosted deployment, configure the application to read the Gemini API key from Streamlit secrets as well as the local environment.
-
-Example Streamlit secret:
+Add this to the Streamlit Secrets configuration:
 
 ```toml
 GEMINI_API_KEY = "your_gemini_api_key_here"
 ```
 
-Do not commit real API credentials to GitHub.
+6. Deploy the application.
 
-## 🔮 Future Enhancements
+Do not commit API keys or secret configuration files to GitHub.
 
-- Integrate browser-based speech recognition and speech synthesis into the main mock interview workflow.
-- Add OCR support for scanned PDF resumes.
-- Add PDF export for final interview reports.
-- Improve answer evaluation with more detailed communication and technical scoring.
-- Add optional interview history and user accounts.
-- Support additional languages for interview practice.
+## Privacy and Data Handling
 
-## 👨‍💻 Contributors
+- The application does not use a database or permanent user account storage.
+- Interview information is maintained using Streamlit session state and browser session storage.
+- Browser session storage is temporary and is not intended as permanent storage.
+- Uploaded resume content and interview answers are sent to Google's Gemini API when AI features are used.
+- Users should avoid uploading sensitive information they do not wish to share with the AI service.
+- Users can use the Clear All option to clear application session data.
 
-Project team members:
+## Documentation
 
-- G. Naga Mithra Reddy
-- Vinukonda Reshma
-- C. Lahari
-- D. Surendra
-- P. Kavitha
+The detailed project documentation PDF is available in the repository:
 
-## 📄 License
+`documentation/AI Interview Coach Documentation (1) (1).pdf`
 
-This project was developed for academic purposes at Kalasalingam Academy of Research and Education.
+## Future Enhancements
 
----
+- Support for additional AI models.
+- More interview categories and job roles.
+- Advanced performance analytics.
+- Additional resume formats.
+- More detailed interview improvement recommendations.
 
-**AI Interview Coach — Practice Better. Perform Confidently.**
+## Author
+
+**AI Interview Coach — College Project**
+
+## License
+
+This project is developed for educational and academic purposes.
