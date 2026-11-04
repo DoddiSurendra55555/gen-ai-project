@@ -1,0 +1,167 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Interview Session Recovery</title>
+</head>
+<body>
+<script>
+    let initialized = false;
+    let lastPayload = null;
+    let clearCompleted = false;
+
+    const STORAGE_KEY = "ai_interview_coach_state_v1";
+
+    function getStorage() {
+        try {
+            return window.parent.sessionStorage;
+        } catch (error) {
+            return window.sessionStorage;
+        }
+    }
+
+    function sendToStreamlit(value) {
+        window.parent.postMessage(
+            {
+                isStreamlitMessage: true,
+                type: "streamlit:setComponentValue",
+                value: value
+            },
+            "*"
+        );
+    }
+
+    function setFrameHeight() {
+        window.parent.postMessage(
+            {
+                isStreamlitMessage: true,
+                type: "streamlit:setFrameHeight",
+                height: 0
+            },
+            "*"
+        );
+    }
+
+    function handleRender(event) {
+        const message = event.data;
+
+        if (
+            !message ||
+            message.type !== "streamlit:render"
+        ) {
+            return;
+        }
+
+        const args = message.args || {};
+        const payload = args.payload || {};
+
+        // Handle Clear All requests.
+        if (payload.__clear_storage__ === true) {
+            try {
+                getStorage().removeItem(STORAGE_KEY);
+
+                initialized = true;
+                lastPayload = null;
+                clearCompleted = true;
+
+                sendToStreamlit({
+                    status: "cleared"
+                });
+            } catch (error) {
+                console.error(
+                    "Could not clear browser storage:",
+                    error
+                );
+
+                sendToStreamlit({
+                    status: "error",
+                    message: "Could not clear saved data."
+                });
+            }
+
+            setFrameHeight();
+            return;
+        }
+
+        // Reset the clear flag after the component receives normal data.
+        clearCompleted = false;
+
+        const currentPayload = JSON.stringify(payload);
+
+        // First connection: check for previously saved data.
+        if (!initialized) {
+            initialized = true;
+
+            try {
+                const storage = getStorage();
+                const savedData = storage.getItem(STORAGE_KEY);
+
+                if (savedData) {
+                    const parsedData = JSON.parse(savedData);
+
+                    lastPayload = JSON.stringify(parsedData);
+
+                    sendToStreamlit({
+                        status: "restore",
+                        data: parsedData
+                    });
+
+                    setFrameHeight();
+                    return;
+                }
+
+                storage.setItem(STORAGE_KEY, currentPayload);
+                lastPayload = currentPayload;
+
+            } catch (error) {
+                console.error(
+                    "Could not access session storage:",
+                    error
+                );
+            }
+
+            sendToStreamlit({
+                status: "ready"
+            });
+
+            setFrameHeight();
+            return;
+        }
+
+        // Save updated application data.
+        if (currentPayload !== lastPayload) {
+            try {
+                getStorage().setItem(
+                    STORAGE_KEY,
+                    currentPayload
+                );
+
+                lastPayload = currentPayload;
+
+            } catch (error) {
+                console.error(
+                    "Could not save interview session:",
+                    error
+                );
+            }
+        }
+
+        setFrameHeight();
+    }
+
+    window.addEventListener("message", handleRender);
+
+    window.parent.postMessage(
+        {
+            isStreamlitMessage: true,
+            type: "streamlit:componentReady",
+            apiVersion: 1
+        },
+        "*"
+    );
+
+    setFrameHeight();
+</script>
+</body>
+</html>

@@ -1,0 +1,614 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 12px;
+            background: transparent;
+            font-family: Arial, sans-serif;
+            color: #172554;
+        }
+
+        .voice-card {
+            background: #ffffff;
+            border: 1px solid #dbeafe;
+            border-radius: 16px;
+            padding: 22px;
+            box-shadow: 0 5px 18px rgba(30, 64, 175, 0.07);
+        }
+
+        .question-label {
+            color: #2563eb;
+            font-size: 12px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .question {
+            font-size: 18px;
+            font-weight: bold;
+            line-height: 1.6;
+            color: #172554;
+            margin-bottom: 18px;
+        }
+
+        .status {
+            background: #eff6ff;
+            border-radius: 9px;
+            padding: 11px;
+            margin: 14px 0;
+            font-size: 13px;
+            color: #1d4ed8;
+        }
+
+        .answer-label {
+            font-weight: bold;
+            font-size: 14px;
+            margin: 18px 0 8px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 145px;
+            padding: 13px;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            resize: vertical;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+            outline: none;
+        }
+
+        textarea:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 2px #dbeafe;
+        }
+
+        .button-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 9px;
+            margin-top: 14px;
+        }
+
+        button {
+            border: none;
+            border-radius: 9px;
+            padding: 12px 16px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .primary {
+            background: #2563eb;
+            color: white;
+        }
+
+        .secondary {
+            background: #eff6ff;
+            color: #1d4ed8;
+        }
+
+        .success {
+            background: #15803d;
+            color: white;
+        }
+
+        .help {
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.6;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="voice-card">
+
+    <div class="question-label">
+        CURRENT INTERVIEW QUESTION
+    </div>
+
+    <div class="question" id="question">
+        Waiting for question...
+    </div>
+
+    <div class="status" id="status">
+        Connecting to Streamlit...
+    </div>
+
+    <div class="answer-label">
+        Your Spoken Answer
+    </div>
+
+    <textarea
+        id="answer"
+        placeholder="Your speech transcription will appear here. You can also edit it."
+    ></textarea>
+
+    <div class="button-row">
+
+        <button
+            class="primary"
+            id="startButton"
+            onclick="startListening()"
+        >
+            🎤 Start Speaking
+        </button>
+
+        <button
+            class="secondary"
+            onclick="stopListening()"
+        >
+            ⏹ Stop
+        </button>
+
+        <button
+            class="secondary"
+            onclick="speakQuestion()"
+        >
+            🔊 Repeat Question
+        </button>
+
+        <button
+            class="success"
+            onclick="submitAnswer()"
+        >
+            ✓ Submit Answer
+        </button>
+
+        <button
+            class="secondary"
+            onclick="clearAnswer()"
+        >
+            Clear
+        </button>
+
+    </div>
+
+    <div class="help">
+        Allow microphone permission when your browser asks.
+        Speak naturally. Press Enter to submit your answer.
+        Use Shift + Enter to add a new line.
+    </div>
+
+</div>
+
+
+<script>
+
+    let questionText = "";
+    let recognition = null;
+    let listening = false;
+    let speechSupported = false;
+    let submitted = false;
+    let finalTranscript = "";
+    let interimTranscript = "";
+    let lastSubmittedEvent = 0;
+
+
+    // ------------------------------------------------
+    // STREAMLIT COMMUNICATION
+    // ------------------------------------------------
+
+    function sendToStreamlit(type, data = {}) {
+
+        window.parent.postMessage(
+            {
+                isStreamlitMessage: true,
+                type: type,
+                ...data
+            },
+            "*"
+        );
+
+    }
+
+
+    function setComponentValue(value) {
+
+        sendToStreamlit(
+            "streamlit:setComponentValue",
+            {
+                value: value
+            }
+        );
+
+    }
+
+
+    function setFrameHeight() {
+
+        sendToStreamlit(
+            "streamlit:setFrameHeight",
+            {
+                height: document.body.scrollHeight
+            }
+        );
+
+    }
+
+
+    // ------------------------------------------------
+    // STATUS
+    // ------------------------------------------------
+
+    function updateStatus(message) {
+
+        document.getElementById("status").textContent = message;
+
+    }
+
+
+    // ------------------------------------------------
+    // QUESTION DISPLAY AND AUTOMATIC SPEECH
+    // ------------------------------------------------
+
+    function speakQuestion() {
+
+        if (!questionText) {
+            updateStatus("No question is available.");
+            return;
+        }
+
+        if (!("speechSynthesis" in window)) {
+            updateStatus("Speech synthesis is not supported by this browser.");
+            return;
+        }
+
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(questionText);
+
+        utterance.lang = "en-US";
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+
+        utterance.onstart = function() {
+            updateStatus("Reading the interview question...");
+        };
+
+        utterance.onend = function() {
+            updateStatus("Question finished. You can start speaking.");
+        };
+
+        utterance.onerror = function() {
+            updateStatus("Automatic speech failed. Use Repeat Question.");
+        };
+
+        window.speechSynthesis.speak(utterance);
+
+    }
+
+
+    function loadQuestion(question) {
+
+        if (!question || question === questionText) {
+            return;
+        }
+
+        questionText = question;
+
+        stopListening();
+
+        window.speechSynthesis.cancel();
+
+        document.getElementById("question").textContent = question;
+
+        document.getElementById("answer").value = "";
+
+        finalTranscript = "";
+        interimTranscript = "";
+        submitted = false;
+
+        updateStatus("New question loaded.");
+
+        setTimeout(function() {
+            speakQuestion();
+        }, 400);
+
+        setFrameHeight();
+
+    }
+
+
+    // ------------------------------------------------
+    // SPEECH RECOGNITION
+    // ------------------------------------------------
+
+    function initializeRecognition() {
+
+        const SpeechRecognition =
+            window.SpeechRecognition ||
+            window.webkitSpeechRecognition;
+
+        if (!SpeechRecognition) {
+
+            speechSupported = false;
+
+            updateStatus(
+                "Speech recognition is not supported. Please use Microsoft Edge or Chrome."
+            );
+
+            document.getElementById("startButton").disabled = true;
+
+            return;
+
+        }
+
+        speechSupported = true;
+
+        recognition = new SpeechRecognition();
+
+        recognition.lang = "en-US";
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onstart = function() {
+
+            listening = true;
+
+            updateStatus("Listening... Speak your answer.");
+
+        };
+
+
+        recognition.onresult = function(event) {
+
+            interimTranscript = "";
+
+            for (
+                let i = event.resultIndex;
+                i < event.results.length;
+                i++
+            ) {
+
+                const transcript =
+                    event.results[i][0].transcript;
+
+                if (event.results[i].isFinal) {
+
+                    finalTranscript += transcript + " ";
+
+                } else {
+
+                    interimTranscript += transcript;
+
+                }
+
+            }
+
+            const combined =
+                (finalTranscript + interimTranscript).trim();
+
+            document.getElementById("answer").value = combined;
+
+        };
+
+
+        recognition.onerror = function(event) {
+
+            if (event.error === "not-allowed") {
+
+                updateStatus(
+                    "Microphone permission denied. Allow microphone access in your browser."
+                );
+
+            } else {
+
+                updateStatus(
+                    "Microphone error: " + event.error
+                );
+
+            }
+
+        };
+
+
+        recognition.onend = function() {
+
+            listening = false;
+
+            if (!submitted) {
+
+                updateStatus(
+                    "Microphone stopped. You can edit or submit your answer."
+                );
+
+            }
+
+        };
+
+    }
+
+
+    function startListening() {
+
+        if (!speechSupported || !recognition) {
+
+            updateStatus("Speech recognition is unavailable.");
+
+            return;
+
+        }
+
+        if (listening) {
+            return;
+        }
+
+        submitted = false;
+
+        finalTranscript =
+            document.getElementById("answer").value.trim();
+
+        interimTranscript = "";
+
+        try {
+
+            recognition.start();
+
+        } catch (error) {
+
+            updateStatus("Could not start microphone. Please try again.");
+
+        }
+
+    }
+
+
+    function stopListening() {
+
+        if (recognition && listening) {
+
+            recognition.stop();
+
+        }
+
+        listening = false;
+
+    }
+
+
+    // ------------------------------------------------
+    // SUBMIT ANSWER
+    // ------------------------------------------------
+
+    function submitAnswer() {
+
+        if (submitted) {
+            return;
+        }
+
+        stopListening();
+
+        const answer =
+            document.getElementById("answer").value.trim();
+
+        if (!answer) {
+
+            updateStatus("Please speak or type an answer first.");
+
+            return;
+
+        }
+
+        submitted = true;
+
+        const eventId = Date.now();
+
+        lastSubmittedEvent = eventId;
+
+        updateStatus("Submitting your answer...");
+
+        setComponentValue({
+
+            transcript: answer,
+
+            submitted: true,
+
+            event_id: eventId
+
+        });
+
+    }
+
+
+    // ------------------------------------------------
+    // CLEAR ANSWER
+    // ------------------------------------------------
+
+    function clearAnswer() {
+
+        stopListening();
+
+        finalTranscript = "";
+        interimTranscript = "";
+        submitted = false;
+
+        document.getElementById("answer").value = "";
+
+        updateStatus("Answer cleared.");
+
+    }
+
+
+    // ------------------------------------------------
+    // ENTER KEY SUBMISSION
+    // ------------------------------------------------
+
+    document.getElementById("answer").addEventListener(
+        "keydown",
+        function(event) {
+
+            if (
+                event.key === "Enter" &&
+                !event.shiftKey
+            ) {
+
+                event.preventDefault();
+
+                submitAnswer();
+
+            }
+
+        }
+    );
+
+
+    // ------------------------------------------------
+    // RECEIVE STREAMLIT DATA
+    // ------------------------------------------------
+
+    window.addEventListener("message", function(event) {
+
+        const data = event.data;
+
+        if (!data || data.type !== "streamlit:render") {
+            return;
+        }
+
+        const args = data.args || {};
+
+        loadQuestion(args.question || "");
+
+    });
+
+
+    // ------------------------------------------------
+    // INITIALIZE
+    // ------------------------------------------------
+
+    initializeRecognition();
+
+    sendToStreamlit(
+        "streamlit:componentReady",
+        {
+            apiVersion: 1
+        }
+    );
+
+    setFrameHeight();
+
+</script>
+
+</body>
+</html>
