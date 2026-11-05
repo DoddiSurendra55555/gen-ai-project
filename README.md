@@ -1,77 +1,235 @@
-# 🎯 AI Interview Coach
+# AI Interview Coach
 
-**Practice Better. Perform Confidently.**
+An AI-powered mock interview platform that helps candidates prepare for technical, HR, and behavioral interviews using personalized questions, voice-based interaction, and intelligent feedback.
 
-AI Interview Coach is an AI-powered interview preparation platform that helps students and job seekers prepare for interviews using their own resumes. It analyzes uploaded resumes, generates personalized interview questions, evaluates answers, and provides a final performance report using Google's Gemini API.
+The application uses **Google Gemini and Hybrid Retrieval-Augmented Generation (Hybrid RAG)** to generate resume-based interview questions and evaluate candidate answers using relevant information from both the candidate's resume and a general interview knowledge base.
 
-## 📌 Project Information
-
-| Detail | Information |
-|---|---|
-| Project Name | AI Interview Coach |
-| Institution | Kalasalingam Academy of Research and Education |
-| Project ID | PRJ011 |
-| Team ID | T011 |
-| Project Guide | Mr. SHIRWIN PRINCE I |
-| Main Framework | Streamlit |
-| Programming Language | Python |
-| AI Model Provider | Google Gemini |
-
-## ✨ Features
+## Features
 
 ### 1. Resume Analysis
-- Upload a resume in PDF format.
+- Upload a PDF resume.
 - Extract resume text using PyMuPDF.
-- Validate PDF files and enforce a 5 MB upload limit.
-- Analyze skills, education, experience, strengths, and improvement areas using Gemini.
+- Analyze skills, education, projects, experience, and other relevant details using Google Gemini.
+- Use resume information to personalize interview preparation.
 
 ### 2. Personalized Interview Setup
-- Select your target job role.
-- Choose an interview type:
-  - Technical
-  - Behavioral
-  - Mixed
-- Select difficulty:
-  - Easy
-  - Medium
-  - Hard
-- Generate between 1 and 15 personalized interview questions.
+- Select a job role.
+- Choose the interview type.
+- Select the difficulty level.
+- Generate interview questions using Hybrid RAG.
+- Receive questions based on the candidate's resume and relevant interview knowledge.
 
-### 3. Mock Interview
-- Answer generated questions one at a time.
-- Submit answers for AI-powered evaluation.
-- Receive a score out of 100.
-- Get feedback, strengths, areas for improvement, and an example of a stronger answer.
+### 3. Voice-Based Mock Interview
+- Listen to interview questions using browser text-to-speech.
+- Answer using the browser microphone.
+- Convert spoken responses into editable text using browser speech recognition.
+- Submit typed or spoken answers for evaluation.
 
-### 4. Interview Results
-- View individual answer scores.
-- Check overall interview performance.
-- Visualize results using Plotly charts.
-- Receive AI-generated final feedback and recommendations.
-- Download the interview report in JSON format.
+### 4. Hybrid RAG-Based Question Generation
+- Retrieve relevant information from the candidate's resume.
+- Retrieve relevant information from the general interview knowledge base.
+- Combine the retrieved information into context for Gemini.
+- Generate personalized and relevant interview questions.
 
-### 5. Session Management
-- Store interview information temporarily using Streamlit Session State.
-- Clear application data using the Clear All option.
-- No project database is required.
+### 5. Hybrid RAG-Based Answer Evaluation
+- Evaluate answers using relevant resume information and general interview knowledge.
+- Assess relevance, technical accuracy, clarity, and completeness.
+- Generate scores, feedback, strengths, improvements, and example stronger answers.
+- Apply the same RAG-based evaluation to follow-up answers.
 
-## 🛠️ Technology Stack
+### 6. Adaptive Follow-Up Questions
+- Generate follow-up questions based on previous answers and evaluations.
+- Explore the candidate's understanding in greater depth.
+- Support up to two follow-up questions per main interview question.
+
+### 7. Interview Results
+- Display individual answer scores.
+- Show strengths and areas for improvement.
+- Display example stronger answers.
+- Include follow-up discussion evaluations.
+- Generate a final interview performance report.
+- Visualize performance using Plotly.
+- Download interview results as JSON.
+
+---
+
+## Hybrid RAG Architecture
+
+### What is Hybrid RAG?
+
+Hybrid Retrieval-Augmented Generation (Hybrid RAG) is an approach that combines information from multiple knowledge sources before sending relevant context to a Large Language Model (LLM).
+
+In this project, two knowledge sources are used:
+
+1. **Candidate Resume:** Contains personal information such as skills, education, projects, experience, and technical knowledge.
+2. **General Interview Knowledge Base:** Contains general technical, programming, software engineering, behavioral, and HR interview knowledge.
+
+The system retrieves relevant information from both sources and combines it to provide Gemini with context for generating personalized questions and evaluating answers.
+
+### Architecture Overview
+
+```text
+                 CANDIDATE RESUME
+                        |
+                        v
+                 PDF TEXT EXTRACTION
+                        |
+                        v
+                 RESUME DOCUMENTS
+                        |
+                        |
+                        v
+GENERAL INTERVIEW KNOWLEDGE BASE
+                        |
+                        v
+                GENERAL DOCUMENTS
+                        |
+                        |
+                        v
+              DOCUMENT PREPARATION
+                        |
+                        v
+                 TEXT CHUNKING
+                        |
+                        v
+              GEMINI EMBEDDINGS
+                        |
+                        v
+             HYBRID KNOWLEDGE STORE
+                        |
+             +----------+----------+
+             |                     |
+             v                     v
+       RESUME RETRIEVAL      GENERAL RETRIEVAL
+             |                     |
+             +----------+----------+
+                        |
+                        v
+                RETRIEVED CONTEXT
+                        |
+             +----------+----------+
+             |                     |
+             v                     v
+      QUESTION GENERATION    ANSWER EVALUATION
+             |                     |
+             v                     v
+       PERSONALIZED           AI FEEDBACK
+       QUESTIONS              AND SCORES
+             |                     |
+             +----------+----------+
+                        |
+                        v
+                INTERVIEW RESULTS
+```
+
+### How Hybrid RAG Works
+
+**Step 1: Collect knowledge sources**
+
+The system collects the candidate's extracted resume text and general interview knowledge documents.
+
+The general knowledge base contains 15 interview-related topics, including:
+
+- Programming Fundamentals
+- Data Structures and Algorithms
+- Python Programming
+- Databases and SQL
+- Machine Learning and Artificial Intelligence
+- Deep Learning and Generative AI
+- Web Development
+- Cloud Computing and Deployment
+- Software Engineering
+- Software Testing and Debugging
+- Cybersecurity Fundamentals
+- Project Explanation
+- Behavioral Interview and STAR Method
+- HR Interview and Communication
+- Problem Solving and Communication
+
+**Step 2: Document preparation and chunking**
+
+The collected documents are prepared and divided into smaller text chunks.
+
+Chunking allows the retrieval system to identify relevant sections instead of processing entire documents for every query.
+
+Each chunk retains its source information, such as whether it comes from the candidate's resume or the general knowledge base.
+
+**Step 3: Generate embeddings**
+
+The project uses Google's `gemini-embedding-001` embedding model.
+
+Text chunks are converted into numerical vector representations with a configured embedding dimension of 768.
+
+These vectors represent the semantic meaning of the text and allow the system to compare the relevance of different chunks.
+
+**Step 4: Build the hybrid knowledge store**
+
+The generated embeddings and their associated text and metadata are organized into a knowledge store.
+
+The store contains both:
+
+- Resume-specific knowledge.
+- General interview knowledge.
+
+The knowledge store is maintained in the Streamlit session rather than permanently saving candidate-specific vector data.
+
+**Step 5: Retrieve relevant information**
+
+When a question needs to be generated or an answer needs to be evaluated, the system creates a retrieval query.
+
+It retrieves relevant chunks separately from:
+
+- The candidate's resume.
+- The general interview knowledge base.
+
+Cosine similarity is used to measure the semantic similarity between the query embedding and stored document embeddings.
+
+The most relevant chunks from both sources are selected and combined into a single context.
+
+**Step 6: Generate personalized questions**
+
+The retrieved context is provided to Google Gemini along with the candidate's resume analysis and interview settings.
+
+Gemini uses this information to generate interview questions relevant to the candidate's background and selected job role.
+
+**Step 7: Evaluate candidate answers**
+
+When the candidate submits an answer, the system retrieves relevant resume and general knowledge chunks again.
+
+Gemini receives the interview question, candidate answer, resume analysis, expected topics, and retrieved Hybrid RAG context.
+
+It generates an evaluation containing:
+
+- Score (0–100).
+- Feedback.
+- Strengths.
+- Areas for improvement.
+- Example of a stronger answer.
+
+The same Hybrid RAG evaluation process is used for main interview answers and follow-up answers.
+
+---
+
+## Technology Stack
 
 | Technology | Purpose |
 |---|---|
 | Python | Main programming language |
-| Streamlit | Web application framework and user interface |
-| Google Gemini API | Resume analysis, question generation, and answer evaluation |
-| google-genai | Gemini API integration |
-| PyMuPDF | PDF text extraction |
-| Plotly | Performance charts and visualizations |
-| python-dotenv | Local environment variable management |
-| pytest | Automated testing |
+| Streamlit | Web application framework |
+| Google Gemini API | AI question generation and answer evaluation |
+| `gemini-embedding-001` | Text embedding generation |
+| PyMuPDF | PDF resume text extraction |
+| NumPy / Python vector operations | Numerical similarity calculations |
+| Cosine Similarity | Semantic retrieval |
+| Plotly | Interview performance visualization |
+| Browser Web Speech API | Speech recognition and text-to-speech |
+| JSON | Interview result export and data handling |
+| Pytest | Application testing |
 
-## 📁 Project Structure
+## Project Structure
 
 ```text
-AI-Interview-Coach/
+AI Interview Coach/
 │
 ├── app.py
 │
@@ -84,181 +242,139 @@ AI-Interview-Coach/
 ├── utils/
 │   ├── ai_engine.py
 │   ├── resume_parser.py
-│   └── helpers.py
+│   ├── helpers.py
+│   ├── browser_storage.py
+│   ├── browser_voice.py
+│   ├── voice_engine.py
+│   ├── rag_engine.py
+│   ├── hybrid_rag.py
+│   ├── rag_question_generator.py
+│   └── rag_evaluator.py
+│
+├── knowledge_base/
+│   └── interview_knowledge.py
 │
 ├── tests/
 │   ├── test_resume_parser.py
 │   └── test_helpers.py
 │
+├── browser_storage_component/
+│   └── index.html
+│
+├── browser_voice_component/
+│   └── index.html
+│
 ├── .streamlit/
 │   └── config.toml
 │
-├── .env
 ├── .env.example
 ├── .gitignore
 ├── requirements.txt
 └── README.md
 ```
 
-## ⚙️ Installation and Setup
+## Installation and Setup
 
 ### Prerequisites
 
-Install the following before running the application:
+- Python 3.10 or later.
+- Google Gemini API key.
+- Git.
+- A modern web browser with microphone support.
 
-- Python 3.10 or later
-- pip (Python package installer)
-- Google Gemini API key
-- Visual Studio Code (recommended)
-
-### Step 1: Clone the Repository
+### 1. Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/ai-interview-coach.git
+git clone YOUR_GITHUB_REPOSITORY_URL
 ```
 
-Navigate into the project directory:
+Move into the project directory:
 
 ```bash
-cd ai-interview-coach
+cd "AI Interview Coach"
 ```
 
-### Step 2: Install Dependencies
+### 2. Install dependencies
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-### Step 3: Configure the Gemini API Key
+### 3. Configure the Gemini API key
 
-Create a `.env` file in the project root directory.
+Create a `.env` file in the project's root directory using `.env.example` as a reference.
 
-Add your Gemini API key:
+Add your Google Gemini API key using the variable name expected by the application.
 
-```env
-GEMINI_API_KEY=your_gemini_api_key_here
-```
+**Important:** Never upload `.env` or expose your API key on GitHub.
 
-Get an API key from:
-
-https://aistudio.google.com/apikey
-
-**Important:** Never upload your actual `.env` file or API key to GitHub.
-
-### Step 4: Run the Application
-
-Execute:
+### 4. Run the application
 
 ```bash
 python -m streamlit run app.py
 ```
 
-Open the local application in your browser:
+The application will open in your browser.
 
-http://localhost:8501
+---
 
-## 🚀 Application Workflow
+## Application Workflow
 
-1. Open the AI Interview Coach homepage.
-2. Navigate to Resume Analysis.
-3. Upload your PDF resume.
-4. Click Analyze My Resume.
-5. Review the AI-generated resume analysis.
-6. Open Interview Setup.
-7. Select your job role, interview type, difficulty, and number of questions.
-8. Generate personalized interview questions.
-9. Start the Mock Interview.
-10. Submit answers to each question.
-11. Receive AI-generated evaluation and feedback.
-12. Open Interview Results to view your performance report.
-13. Download your report as a JSON file.
+1. Upload a candidate resume.
+2. Extract and analyze the resume.
+3. Select the desired job role, interview type, and difficulty.
+4. Generate personalized questions using Hybrid RAG.
+5. Start the mock interview.
+6. Answer questions using voice or text.
+7. Retrieve relevant resume and general knowledge for answer evaluation.
+8. Receive AI-generated scores and feedback.
+9. Answer adaptive follow-up questions.
+10. View and download the final interview report.
 
-## 🧪 Testing
+## Testing
 
-The project uses pytest for automated testing.
-
-Run all tests:
+Run the automated tests using:
 
 ```bash
 python -m pytest tests -v
 ```
 
-Check Python syntax:
+Check Python syntax for the RAG modules:
 
 ```bash
-python -m compileall -q app.py pages utils tests
+python -m py_compile utils/rag_engine.py utils/hybrid_rag.py utils/rag_question_generator.py utils/rag_evaluator.py
 ```
 
-Check installed dependencies:
+## Privacy and Data Handling
 
-```bash
-python -m pip check
-```
+- Candidate resumes are processed for interview personalization.
+- Resume-specific knowledge stores are maintained in Streamlit session state.
+- The Hybrid RAG implementation does not use a permanent database for candidate-specific embeddings.
+- Resume content and submitted answers are sent to Google Gemini for AI processing.
+- The application does not provide permanent resume storage or user authentication by default.
+- API keys should be stored in local environment variables or deployment secrets, never committed to source control.
 
-The resume parser tests cover:
+## Current RAG Scope
 
-- Valid PDF text extraction.
-- Empty PDF upload.
-- Invalid PDF file.
-- PDF files exceeding the 5 MB limit.
-- PDF files without readable selectable text.
+Hybrid RAG is integrated into:
 
-## 🔒 Privacy and Data Handling
+- Personalized interview question generation.
+- Main interview answer evaluation.
+- Follow-up answer evaluation.
 
-- Resume and interview data are maintained temporarily using Streamlit Session State.
-- The project does not use a database for permanent storage.
-- Users can clear temporary application data using Clear All.
-- Resume content and interview answers may be sent to Google's Gemini API when AI features are used.
-- The Gemini API key must be kept private and must not be committed to a public repository.
+Adaptive follow-up question generation and final report generation continue to use the existing Gemini-based AI functions.
 
-**Note:** Scanned PDFs containing only images are not currently supported because OCR functionality has not been implemented.
+## Future Enhancements
 
-## ☁️ Deployment
+- Expand the general interview knowledge base.
+- Add support for additional document formats.
+- Improve retrieval ranking and evaluation.
+- Add more interview domains and specialized question collections.
+- Introduce persistent user accounts and interview history.
+- Add advanced analytics for interview performance.
 
-The application can be deployed using Streamlit Community Cloud.
+## Conclusion
 
-1. Push the project source code to a GitHub repository.
-2. Visit https://share.streamlit.io/
-3. Sign in using GitHub.
-4. Select Create app.
-5. Choose the project repository and `main` branch.
-6. Set the main file path to `app.py`.
-7. Add the Gemini API key under the application's Secrets settings.
-8. Deploy the application.
+The AI Interview Coach combines conversational AI, voice-based interaction, resume analysis, and Hybrid Retrieval-Augmented Generation to provide a personalized interview preparation experience.
 
-For hosted deployment, configure the application to read the Gemini API key from Streamlit secrets as well as the local environment.
-
-Example Streamlit secret:
-
-```toml
-GEMINI_API_KEY = "your_gemini_api_key_here"
-```
-
-Do not commit real API credentials to GitHub.
-
-## 🔮 Future Enhancements
-
-- Integrate browser-based speech recognition and speech synthesis into the main mock interview workflow.
-- Add OCR support for scanned PDF resumes.
-- Add PDF export for final interview reports.
-- Improve answer evaluation with more detailed communication and technical scoring.
-- Add optional interview history and user accounts.
-- Support additional languages for interview practice.
-
-## 👨‍💻 Contributors
-
-Project team members:
-
-- G. Naga Mithra Reddy
-- Vinukonda Reshma
-- C. Lahari
-- D. Surendra
-- P. Kavitha
-
-## 📄 License
-
-This project was developed for academic purposes at Kalasalingam Academy of Research and Education.
-
----
-
-**AI Interview Coach — Practice Better. Perform Confidently.**
+By combining candidate-specific resume information with general interview knowledge, the system provides more relevant interview questions and context-aware answer evaluations than a basic prompt-only interview system.

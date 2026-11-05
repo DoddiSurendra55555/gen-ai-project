@@ -1,5 +1,6 @@
 
 import html
+import re
 import streamlit as st
 
 from utils.helpers import (
@@ -7,7 +8,7 @@ from utils.helpers import (
     render_sidebar,
 )
 
-from utils.ai_engine import generate_questions
+from utils.rag_question_generator import generate_rag_questions
 
 
 st.set_page_config(
@@ -196,15 +197,11 @@ st.html("""
    INPUT AND DROPDOWN TEXT VISIBILITY FIX
 --------------------------------------------------------- */
 
-/* General widget labels */
-
 [data-testid="stWidgetLabel"],
 [data-testid="stWidgetLabel"] p,
 [data-testid="stWidgetLabel"] label {
     color: #172554 !important;
 }
-
-/* Text input */
 
 .stTextInput input,
 [data-baseweb="input"] input,
@@ -215,8 +212,6 @@ st.html("""
     caret-color: #2563eb !important;
 }
 
-/* Text input placeholder */
-
 .stTextInput input::placeholder,
 [data-baseweb="input"] input::placeholder {
     color: #64748b !important;
@@ -224,14 +219,10 @@ st.html("""
     opacity: 1 !important;
 }
 
-/* Select box container */
-
 [data-baseweb="select"] > div {
     background-color: #ffffff !important;
     border-color: #bfdbfe !important;
 }
-
-/* Selected dropdown value */
 
 [data-baseweb="select"] div,
 [data-baseweb="select"] span,
@@ -240,16 +231,12 @@ st.html("""
     -webkit-text-fill-color: #172554 !important;
 }
 
-/* Dropdown menu background */
-
 [data-baseweb="popover"],
 [data-baseweb="popover"] > div,
 [data-baseweb="menu"],
 [data-baseweb="menu"] ul {
     background-color: #ffffff !important;
 }
-
-/* Dropdown option text */
 
 [data-baseweb="menu"] li,
 [data-baseweb="menu"] li div,
@@ -262,22 +249,16 @@ st.html("""
     background-color: #ffffff;
 }
 
-/* Hovered dropdown option */
-
 [data-baseweb="menu"] li:hover,
 [data-baseweb="option"]:hover {
     background-color: #eff6ff !important;
 }
-
-/* Highlighted or selected dropdown option */
 
 [data-baseweb="menu"] li[aria-selected="true"],
 [data-baseweb="option"][aria-selected="true"] {
     background-color: #dbeafe !important;
     color: #172554 !important;
 }
-
-/* Dropdown option text remains dark */
 
 [data-baseweb="menu"] li[aria-selected="true"] *,
 [data-baseweb="option"][aria-selected="true"] * {
@@ -413,6 +394,29 @@ st.html("""
     overflow-wrap: anywhere;
 }
 
+/* RAG information */
+
+.rag-info {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 13px;
+    padding: 17px;
+    margin: 15px 0 22px;
+}
+
+.rag-info-title {
+    color: #1d4ed8 !important;
+    font-size: 14px;
+    font-weight: 800;
+    margin-bottom: 7px;
+}
+
+.rag-info-text {
+    color: #475569 !important;
+    font-size: 13px;
+    line-height: 1.8;
+}
+
 /* Alerts and expanders */
 
 [data-testid="stAlert"] {
@@ -462,6 +466,34 @@ hr {
 
 
 # ---------------------------------------------------------
+# HELPER: CLEAN GENERATED TEXT
+# ---------------------------------------------------------
+
+def clean_generated_text(value):
+    """
+    Clean minor formatting issues in generated question text.
+    """
+
+    if not isinstance(value, str):
+        return str(value or "")
+
+    cleaned = value.strip()
+
+    # Add a space when two words were accidentally joined
+    # at a lowercase-to-uppercase boundary.
+    cleaned = re.sub(
+        r"(?<=[a-z])(?=[A-Z])",
+        " ",
+        cleaned,
+    )
+
+    # Normalize repeated spaces and line breaks.
+    cleaned = re.sub(r"\s+", " ", cleaned)
+
+    return cleaned.strip()
+
+
+# ---------------------------------------------------------
 # HERO
 # ---------------------------------------------------------
 
@@ -479,35 +511,51 @@ st.html("""
     <div class="hero-description">
         Customize your mock interview based on your target
         job role, interview type, and experience level.
-        Gemini will create personalized questions using
-        your resume information.
+        Hybrid RAG combines your resume information with
+        general technical and behavioral interview knowledge
+        to create relevant practice questions.
     </div>
 
     <div class="hero-points">
-        <div class="hero-point">✓ Role-Based Questions</div>
+        <div class="hero-point">✓ Resume-Based Questions</div>
+        <div class="hero-point">✓ General Interview Knowledge</div>
         <div class="hero-point">✓ Flexible Difficulty</div>
-        <div class="hero-point">✓ Personalized Practice</div>
     </div>
 </div>
 """)
 
 
 # ---------------------------------------------------------
-# CHECK RESUME ANALYSIS
+# CHECK RESUME ANALYSIS AND EXTRACTED TEXT
 # ---------------------------------------------------------
 
-if not st.session_state.get("resume_analysis"):
+analysis = st.session_state.get("resume_analysis")
+resume_text = st.session_state.get("resume_text")
+
+if not analysis or not resume_text:
 
     st.html("""
     <div class="light-card">
         <div class="card-title">📄 Resume Analysis Required</div>
         <div class="card-description">
         Complete your resume analysis before configuring
-        a personalized interview. This helps Gemini generate
-        questions based on your actual skills and experience.
+        a personalized interview. Hybrid RAG needs both
+        your extracted resume text and its AI analysis
+        to generate personalized questions.
         </div>
     </div>
     """)
+
+    if not resume_text:
+        st.warning(
+            "Your extracted resume text is not available. "
+            "Please process your resume again."
+        )
+
+    if not analysis:
+        st.info(
+            "Your AI resume analysis has not been completed yet."
+        )
 
     if st.button(
         "Go to Resume Analysis →",
@@ -523,8 +571,6 @@ if not st.session_state.get("resume_analysis"):
 # RESUME INFORMATION
 # ---------------------------------------------------------
 
-analysis = st.session_state["resume_analysis"]
-
 candidate_name = html.escape(
     str(analysis.get("name") or "Candidate")
 )
@@ -534,16 +580,55 @@ st.html("""
 <div class="section-title">Resume Successfully Connected</div>
 <div class="section-description">
 Your interview questions will be personalized using your
-resume analysis.
+extracted resume and AI analysis, alongside general
+interview knowledge.
 </div>
 """)
+
+resume_name = html.escape(
+    str(
+        st.session_state.get("uploaded_resume_name")
+        or "Uploaded Resume"
+    )
+)
 
 st.html(f"""
 <div class="resume-card">
     <div class="resume-label">CANDIDATE PROFILE</div>
     <div class="resume-name">👤 {candidate_name}</div>
     <div class="card-description" style="margin-top:8px">
-        Your resume analysis is ready for interview preparation.
+        📄 Resume: {resume_name}
+    </div>
+    <div class="card-description" style="margin-top:5px">
+        Your resume text and AI analysis are ready for
+        Hybrid RAG interview preparation.
+    </div>
+</div>
+""")
+
+
+# ---------------------------------------------------------
+# HYBRID RAG INFORMATION
+# ---------------------------------------------------------
+
+st.html("""
+<div class="rag-info">
+    <div class="rag-info-title">
+        🧠 Hybrid RAG Knowledge System
+    </div>
+    <div class="rag-info-text">
+        Your question generation uses two knowledge sources:
+        <br>
+        <strong>1. Personal Knowledge:</strong>
+        Skills, projects, education, and experience extracted
+        from your resume.
+        <br>
+        <strong>2. General Knowledge:</strong>
+        Technical concepts, programming, databases, AI,
+        software engineering, and behavioral interview topics.
+        <br>
+        Relevant information from both sources is retrieved
+        to help generate questions for your selected job role.
     </div>
 </div>
 """)
@@ -646,7 +731,7 @@ with st.form("interview_setup_form"):
             <div class="config-heading">🔢 Number of Questions</div>
             <div class="config-description">
                 Choose how many personalized questions
-                Gemini should generate.
+                the Hybrid RAG system should generate.
             </div>
         </div>
         """,
@@ -678,7 +763,7 @@ with st.form("interview_setup_form"):
 
 
 # ---------------------------------------------------------
-# GENERATE PERSONALIZED QUESTIONS
+# GENERATE HYBRID RAG QUESTIONS
 # ---------------------------------------------------------
 
 if submitted:
@@ -692,11 +777,12 @@ if submitted:
         try:
 
             with st.spinner(
-                "Gemini is preparing your personalized "
-                "interview questions..."
+                "Hybrid RAG is retrieving relevant resume and "
+                "interview knowledge and generating your questions..."
             ):
 
-                questions = generate_questions(
+                rag_result = generate_rag_questions(
+                    resume_text=resume_text,
                     resume_analysis=analysis,
                     job_role=job_role.strip(),
                     interview_type=interview_type,
@@ -704,13 +790,94 @@ if submitted:
                     num_questions=num_questions,
                 )
 
+            # Validate the RAG generator response.
+            if not isinstance(rag_result, dict):
+
+                raise RuntimeError(
+                    "The Hybrid RAG generator returned an invalid response."
+                )
+
+            questions = rag_result.get("questions", [])
+
+            if not isinstance(questions, list) or not questions:
+
+                raise RuntimeError(
+                    "Hybrid RAG did not generate any questions. "
+                    "Please try again."
+                )
+
+            # Clean generated question text while preserving
+            # the expected question structure.
+            cleaned_questions = []
+
+            for question_data in questions:
+
+                if not isinstance(question_data, dict):
+                    continue
+
+                question_text = clean_generated_text(
+                    question_data.get("question", "")
+                )
+
+                if not question_text:
+                    continue
+
+                category = clean_generated_text(
+                    question_data.get("category") or "General"
+                )
+
+                expected_topics = question_data.get(
+                    "expected_topics", []
+                )
+
+                if not isinstance(expected_topics, list):
+                    expected_topics = []
+
+                cleaned_topics = [
+                    clean_generated_text(topic)
+                    for topic in expected_topics
+                    if str(topic).strip()
+                ]
+
+                cleaned_questions.append(
+                    {
+                        **question_data,
+                        "question": question_text,
+                        "category": category,
+                        "expected_topics": cleaned_topics,
+                    }
+                )
+
+            if not cleaned_questions:
+
+                raise RuntimeError(
+                    "No valid questions were returned. "
+                    "Please try generating questions again."
+                )
+
+            knowledge_summary = rag_result.get(
+                "knowledge_summary", {}
+            )
+
+            if not isinstance(knowledge_summary, dict):
+                knowledge_summary = {}
+
+            # Save interview configuration.
             st.session_state["job_role"] = job_role.strip()
             st.session_state["interview_type"] = interview_type
             st.session_state["difficulty"] = difficulty
             st.session_state["num_questions"] = num_questions
 
-            st.session_state["interview_questions"] = questions
+            # Save generated questions and RAG information.
+            st.session_state["interview_questions"] = cleaned_questions
 
+            st.session_state["rag_knowledge_summary"] = (
+                knowledge_summary
+            )
+
+            st.session_state["rag_enabled"] = True
+
+            # Reset interview progress.
             st.session_state["current_question_index"] = 0
             st.session_state["user_answers"] = []
             st.session_state["answer_evaluations"] = []
@@ -719,8 +886,8 @@ if submitted:
             st.session_state["interview_completed"] = False
 
             st.success(
-                f"Successfully generated {len(questions)} "
-                "personalized interview questions!"
+                f"Successfully generated {len(cleaned_questions)} "
+                "Hybrid RAG interview questions!"
             )
 
         except ValueError as error:
@@ -731,11 +898,19 @@ if submitted:
 
             st.error(str(error))
 
-        except Exception:
+        except Exception as error:
 
             st.error(
                 "An unexpected error occurred while generating "
-                "questions. Please try again."
+                "Hybrid RAG questions. Please check your Gemini "
+                "API configuration and try again."
+            )
+
+            # Keep detailed error information in the terminal
+            # for local debugging without exposing it to users.
+            print(
+                "Hybrid RAG question generation error:",
+                repr(error),
             )
 
 
@@ -778,9 +953,48 @@ if questions:
         <div class="summary-item">🎯 Interview Type: {type_summary}</div>
         <div class="summary-item">📈 Difficulty: {difficulty_summary}</div>
         <div class="summary-item">🔢 Total Questions: {len(questions)}</div>
+        <div class="summary-item">🧠 Question Generation: Hybrid RAG</div>
     </div>
     """)
 
+    # Display knowledge retrieval information.
+    knowledge_summary = st.session_state.get(
+        "rag_knowledge_summary", {}
+    )
+
+    if knowledge_summary:
+
+        total_chunks = knowledge_summary.get(
+            "total_chunks", 0
+        )
+
+        resume_chunks = knowledge_summary.get(
+            "resume_chunks", 0
+        )
+
+        general_chunks = knowledge_summary.get(
+            "general_chunks", 0
+        )
+
+        st.html(f"""
+        <div class="rag-info">
+            <div class="rag-info-title">
+                🧠 Hybrid Knowledge System Summary
+            </div>
+            <div class="rag-info-text">
+                Total knowledge chunks:
+                <strong>{int(total_chunks)}</strong>
+                <br>
+                Resume knowledge chunks:
+                <strong>{int(resume_chunks)}</strong>
+                <br>
+                General interview knowledge chunks:
+                <strong>{int(general_chunks)}</strong>
+            </div>
+        </div>
+        """)
+
+    # Display generated questions.
     for index, question_data in enumerate(questions, start=1):
 
         category = html.escape(
@@ -788,10 +1002,18 @@ if questions:
         )
 
         question_text = html.escape(
-            str(question_data.get("question") or "No question available.")
+            str(
+                question_data.get("question")
+                or "No question available."
+            )
         )
 
-        expected_topics = question_data.get("expected_topics", [])
+        expected_topics = question_data.get(
+            "expected_topics", []
+        )
+
+        if not isinstance(expected_topics, list):
+            expected_topics = []
 
         safe_topics = "".join(
             f"<li>{html.escape(str(topic))}</li>"
@@ -828,7 +1050,7 @@ if questions:
     <div class="light-card">
         <div class="card-title">🎤 Ready to Start Practising?</div>
         <div class="card-description">
-            Your personalized questions are ready.
+            Your Hybrid RAG personalized questions are ready.
             Continue to the Mock Interview page to begin
             answering questions using your microphone or text.
         </div>

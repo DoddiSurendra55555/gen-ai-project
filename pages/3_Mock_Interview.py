@@ -7,7 +7,8 @@ from utils.helpers import (
     render_sidebar,
 )
 
-from utils.ai_engine import evaluate_answer
+from utils.ai_engine import generate_follow_up_question
+from utils.rag_evaluator import evaluate_answer_with_rag
 from utils.browser_voice import browser_voice
 
 
@@ -32,6 +33,9 @@ render_sidebar()
 
 if "processed_voice_event_ids" not in st.session_state:
     st.session_state["processed_voice_event_ids"] = []
+
+
+MAX_FOLLOW_UPS = 2
 
 
 # ---------------------------------------------------------
@@ -533,6 +537,13 @@ if not st.session_state.get("interview_started"):
         st.session_state["interview_completed"] = False
         st.session_state["processed_voice_event_ids"] = []
 
+        # Store follow-up data inside each question so the existing
+        # browser session storage also preserves it after refresh.
+        for question_item in st.session_state["interview_questions"]:
+            question_item["_follow_up_questions"] = []
+            question_item["_follow_up_answers"] = []
+            question_item["_follow_up_evaluations"] = []
+
         st.rerun()
 
     st.stop()
@@ -585,9 +596,7 @@ if current_index >= len(questions):
 
 total_questions = len(questions)
 
-answered_questions = len(
-    st.session_state["answer_evaluations"]
-)
+answered_questions = current_index
 
 progress = min(
     answered_questions / total_questions,
@@ -623,6 +632,15 @@ with progress_col2:
     </div>
     """)
 
+if (
+    current_index < total_questions
+    and len(st.session_state["answer_evaluations"]) > current_index
+):
+    st.caption(
+        "Main answer evaluated. Complete the follow-up discussion "
+        "before moving to the next main question."
+    )
+
 st.divider()
 
 
@@ -640,29 +658,80 @@ question_category = html.escape(
     str(current_question.get("category", "General"))
 )
 
-safe_question_text = html.escape(question_text)
+# Each main question owns its follow-up history. Keeping this data
+# inside interview_questions means the existing browser persistence
+# automatically saves and restores it.
+follow_up_questions = current_question.setdefault(
+    "_follow_up_questions", []
+)
+follow_up_answers = current_question.setdefault(
+    "_follow_up_answers", []
+)
+follow_up_evaluations = current_question.setdefault(
+    "_follow_up_evaluations", []
+)
+
+main_answer_already_submitted = (
+    len(st.session_state["answer_evaluations"]) > current_index
+)
+
+is_follow_up_stage = main_answer_already_submitted
+
+if is_follow_up_stage:
+    follow_up_index = len(follow_up_answers)
+
+    if follow_up_index >= len(follow_up_questions):
+        # No pending follow-up remains. Move to the next main question.
+        st.session_state["current_question_index"] += 1
+        st.rerun()
+
+    active_follow_up = follow_up_questions[follow_up_index]
+    active_question_text = str(
+        active_follow_up.get("question", "")
+    )
+    active_question_label = (
+        f"FOLLOW-UP {follow_up_index + 1} OF {MAX_FOLLOW_UPS}"
+    )
+    active_category = "Personalized follow-up"
+else:
+    follow_up_index = 0
+    active_question_text = question_text
+    active_question_label = f"QUESTION {current_index + 1:02d}"
+    active_category = question_category
+
+safe_active_question = html.escape(active_question_text)
+safe_active_label = html.escape(active_question_label)
+safe_active_category = html.escape(str(active_category))
 
 st.html(f"""
 <div class="section-eyebrow">LISTEN CAREFULLY AND ANSWER</div>
-<div class="section-title">Current Interview Question</div>
+<div class="section-title">
+    {"Follow-up Question" if is_follow_up_stage else "Current Interview Question"}
+</div>
 
 <div class="question-panel">
     <div class="question-label">
-        QUESTION {current_index + 1:02d}
+        {safe_active_label}
         &nbsp; • &nbsp;
-        {question_category}
+        {safe_active_category}
     </div>
 
     <div class="question-text">
-        {safe_question_text}
+        {safe_active_question}
     </div>
 </div>
 """)
 
-st.caption(
-    "Your browser reads the question aloud automatically. "
-    "You can use the Repeat Question button if needed."
-)
+if is_follow_up_stage:
+    st.info(
+        "Gemini has asked a follow-up based on your previous answer. "
+        "Answer it naturally; this helps explore your understanding in more depth."
+    )
+else:
+    st.caption(
+        "Your browser reads the question aloud automatically. "
+        "You can use the Repeat Question button if needed."
+    )
 
 
 # ---------------------------------------------------------
@@ -680,9 +749,14 @@ st.html("""
 </div>
 """)
 
+voice_stage = "followup" if is_follow_up_stage else "main"
+
 voice_result = browser_voice(
-    question=question_text,
-    key=f"voice_interview_question_{current_index}",
+    question=active_question_text,
+    key=(
+        f"voice_interview_{current_index}_"
+        f"{voice_stage}_{follow_up_index}"
+    ),
 )
 
 
@@ -693,7 +767,6 @@ voice_result = browser_voice(
 if voice_result and voice_result.get("submitted"):
 
     user_answer = voice_result.get("transcript", "").strip()
-
     event_id = voice_result.get("event_id")
 
     processed_events = st.session_state[
@@ -703,59 +776,156 @@ if voice_result and voice_result.get("submitted"):
     if event_id not in processed_events:
 
         if not user_answer:
-
             st.error(
                 "No answer was received. Please speak or type "
                 "an answer before submitting."
             )
 
         else:
-
             try:
-
                 with st.spinner(
                     "Gemini is evaluating your answer. Please wait..."
                 ):
-
-                    evaluation = evaluate_answer(
-                        question=question_text,
+                    evaluation = evaluate_answer_with_rag(
+                        question=active_question_text,
                         answer=user_answer,
+                        resume_text=st.session_state.get("resume_text", ""),
                         resume_analysis=st.session_state.get(
                             "resume_analysis",
                             {},
                         ),
+                        expected_topics=current_question.get(
+                            "expected_topics",
+                            [],
+                        ),
                     )
 
-                # Prevent duplicate evaluation.
-
+                # Mark this browser event as processed only after
+                # the answer evaluation succeeds.
                 processed_events.append(event_id)
 
-                # Save answer and evaluation.
+                if not is_follow_up_stage:
+                    # Save the main answer and its evaluation using
+                    # the original lists expected by the Results page.
+                    st.session_state["user_answers"].append(user_answer)
+                    st.session_state["answer_evaluations"].append(evaluation)
 
-                st.session_state["user_answers"].append(
-                    user_answer
-                )
+                    # Decide whether this answer deserves a follow-up.
+                    if len(follow_up_questions) < MAX_FOLLOW_UPS:
+                        try:
+                            with st.spinner(
+                                "Gemini is preparing a personalized follow-up..."
+                            ):
+                                decision = generate_follow_up_question(
+                                    question=question_text,
+                                    answer=user_answer,
+                                    evaluation=evaluation,
+                                    resume_analysis=st.session_state.get(
+                                        "resume_analysis",
+                                        {},
+                                    ),
+                                    job_role=st.session_state.get(
+                                        "job_role", ""
+                                    ),
+                                    difficulty=st.session_state.get(
+                                        "difficulty", "Medium"
+                                    ),
+                                    previous_follow_ups=[],
+                                )
 
-                st.session_state["answer_evaluations"].append(
-                    evaluation
-                )
+                            if decision.get("should_ask"):
+                                follow_up_questions.append({
+                                    "question": decision["follow_up_question"],
+                                    "reason": decision.get("reason", ""),
+                                })
+                            else:
+                                st.session_state[
+                                    "current_question_index"
+                                ] += 1
 
-                # Move to the next question.
+                        except Exception as follow_up_error:
+                            st.warning(
+                                "Your answer was evaluated, but Gemini "
+                                "could not generate a follow-up. "
+                                "The interview will continue. "
+                                f"Details: {follow_up_error}"
+                            )
+                            st.session_state[
+                                "current_question_index"
+                            ] += 1
+                    else:
+                        st.session_state[
+                            "current_question_index"
+                        ] += 1
 
-                st.session_state["current_question_index"] += 1
+                else:
+                    # Save follow-up answer and evaluation separately.
+                    follow_up_answers.append(user_answer)
+                    follow_up_evaluations.append(evaluation)
+
+                    # Generate another follow-up only if the maximum
+                    # of two has not been reached.
+                    if len(follow_up_questions) < MAX_FOLLOW_UPS:
+                        try:
+                            previous_questions = [
+                                item.get("question", "")
+                                for item in follow_up_questions
+                            ]
+
+                            with st.spinner(
+                                "Gemini is deciding whether to ask another follow-up..."
+                            ):
+                                decision = generate_follow_up_question(
+                                    question=question_text,
+                                    answer=user_answer,
+                                    evaluation=evaluation,
+                                    resume_analysis=st.session_state.get(
+                                        "resume_analysis",
+                                        {},
+                                    ),
+                                    job_role=st.session_state.get(
+                                        "job_role", ""
+                                    ),
+                                    difficulty=st.session_state.get(
+                                        "difficulty", "Medium"
+                                    ),
+                                    previous_follow_ups=previous_questions,
+                                )
+
+                            if decision.get("should_ask"):
+                                follow_up_questions.append({
+                                    "question": decision["follow_up_question"],
+                                    "reason": decision.get("reason", ""),
+                                })
+                            else:
+                                st.session_state[
+                                    "current_question_index"
+                                ] += 1
+
+                        except Exception as follow_up_error:
+                            st.warning(
+                                "Your follow-up answer was evaluated, "
+                                "but another follow-up could not be generated. "
+                                "The interview will continue. "
+                                f"Details: {follow_up_error}"
+                            )
+                            st.session_state[
+                                "current_question_index"
+                            ] += 1
+                    else:
+                        st.session_state[
+                            "current_question_index"
+                        ] += 1
 
                 st.rerun()
 
             except ValueError as error:
-
                 st.error(str(error))
 
             except RuntimeError as error:
-
                 st.error(str(error))
 
             except Exception:
-
                 st.error(
                     "An unexpected error occurred while evaluating "
                     "your answer. Please try submitting again."
@@ -837,3 +1007,43 @@ if st.session_state["answer_evaluations"]:
                     "No example answer available.",
                 )
             )
+
+            question_follow_ups = questions[index].get(
+                "_follow_up_questions", []
+            )
+            question_follow_up_answers = questions[index].get(
+                "_follow_up_answers", []
+            )
+            question_follow_up_evaluations = questions[index].get(
+                "_follow_up_evaluations", []
+            )
+
+            if question_follow_ups:
+                st.markdown("**Follow-up discussion**")
+
+                for follow_index, follow_item in enumerate(
+                    question_follow_ups
+                ):
+                    st.markdown(
+                        f"**Follow-up {follow_index + 1}:** "
+                        f"{follow_item.get('question', '')}"
+                    )
+
+                    if follow_index < len(question_follow_up_answers):
+                        st.markdown("**Your follow-up answer**")
+                        st.write(question_follow_up_answers[follow_index])
+
+                    if follow_index < len(question_follow_up_evaluations):
+                        follow_evaluation = question_follow_up_evaluations[
+                            follow_index
+                        ]
+                        st.markdown(
+                            "**Follow-up score:** "
+                            f"{follow_evaluation.get('score', 0)}/100"
+                        )
+                        st.write(
+                            follow_evaluation.get(
+                                "feedback",
+                                "No follow-up feedback available.",
+                            )
+                        )

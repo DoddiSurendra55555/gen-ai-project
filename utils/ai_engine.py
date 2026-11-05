@@ -7,7 +7,10 @@ from dotenv import load_dotenv
 from google import genai
 
 
-# Load API key from local .env or Streamlit Cloud secrets.
+# --------------------------------------------------
+# GEMINI CONFIGURATION
+# --------------------------------------------------
+
 load_dotenv()
 
 MODEL_NAME = "gemini-3.1-flash-lite"
@@ -38,7 +41,7 @@ client = genai.Client(api_key=API_KEY)
 
 
 # --------------------------------------------------
-# Shared Gemini JSON generation function
+# SHARED GEMINI JSON GENERATION FUNCTION
 # --------------------------------------------------
 
 def _generate_json(prompt, response_schema):
@@ -102,7 +105,7 @@ def _generate_json(prompt, response_schema):
 
 
 # --------------------------------------------------
-# 1. Resume Analysis
+# 1. RESUME ANALYSIS
 # --------------------------------------------------
 
 RESUME_SCHEMA = {
@@ -201,7 +204,7 @@ Resume content:
 
 
 # --------------------------------------------------
-# 2. Interview Question Generation
+# 2. INTERVIEW QUESTION GENERATION
 # --------------------------------------------------
 
 QUESTIONS_SCHEMA = {
@@ -292,7 +295,7 @@ Instructions:
 
 
 # --------------------------------------------------
-# 3. Answer Evaluation
+# 3. ANSWER EVALUATION
 # --------------------------------------------------
 
 EVALUATION_SCHEMA = {
@@ -365,7 +368,143 @@ Instructions:
 
 
 # --------------------------------------------------
-# 4. Final Interview Report
+# 4. FOLLOW-UP QUESTION GENERATION
+# --------------------------------------------------
+
+FOLLOW_UP_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "should_ask": {
+            "type": "BOOLEAN",
+        },
+        "follow_up_question": {
+            "type": "STRING",
+        },
+        "reason": {
+            "type": "STRING",
+        },
+    },
+    "required": [
+        "should_ask",
+        "follow_up_question",
+        "reason",
+    ],
+}
+
+
+def generate_follow_up_question(
+    question,
+    answer,
+    evaluation,
+    resume_analysis=None,
+    job_role="",
+    difficulty="Medium",
+    previous_follow_ups=None,
+):
+    """
+    Decide whether a useful follow-up is needed and generate it.
+
+    The caller controls the maximum number of follow-ups.
+    """
+
+    if not isinstance(question, str) or not question.strip():
+        raise ValueError("Original interview question cannot be empty.")
+
+    if not isinstance(answer, str) or not answer.strip():
+        raise ValueError("Candidate answer cannot be empty.")
+
+    if not isinstance(evaluation, dict):
+        raise ValueError("Answer evaluation must be a dictionary.")
+
+    if not isinstance(previous_follow_ups, list):
+        previous_follow_ups = []
+
+    prompt = f"""
+You are an experienced human interviewer conducting a live interview.
+
+Your task is to decide whether the candidate's answer deserves
+one useful follow-up question.
+
+Original interview question:
+{question}
+
+Candidate's answer:
+{answer}
+
+Evaluation of the answer:
+{json.dumps(evaluation, ensure_ascii=False)}
+
+Candidate resume context:
+{json.dumps(resume_analysis or {}, ensure_ascii=False)}
+
+Job role:
+{job_role}
+
+Interview difficulty:
+{difficulty}
+
+Previously asked follow-up questions:
+{json.dumps(previous_follow_ups, ensure_ascii=False)}
+
+Instructions:
+
+1. Decide whether a follow-up question would genuinely improve
+   the interview.
+2. Ask a follow-up if the answer is incomplete, unclear,
+   too general, lacks an example, or needs deeper explanation.
+3. You may also ask a deeper question when the candidate gives
+   a strong answer and further exploration is useful.
+4. The follow-up must be directly related to the original question
+   and the candidate's actual answer.
+5. Do not repeat the original question.
+6. Do not repeat any previously asked follow-up question.
+7. Match the selected interview difficulty.
+8. Keep the question clear, natural, and conversational.
+9. Do not introduce unrelated topics.
+10. Do not assume facts that the candidate has not provided.
+11. If the answer is already sufficiently complete and no useful
+    follow-up exists, set should_ask to false and return an empty
+    follow_up_question.
+12. Keep the reason short and explain why the follow-up is useful,
+    or why another question is unnecessary.
+
+Return only the requested structured response.
+"""
+
+    result = _generate_json(prompt, FOLLOW_UP_SCHEMA)
+
+    should_ask = result.get("should_ask")
+    follow_up_question = result.get("follow_up_question")
+    reason = result.get("reason")
+
+    if not isinstance(should_ask, bool):
+        raise RuntimeError(
+            "Gemini returned an invalid follow-up decision."
+        )
+
+    if not isinstance(follow_up_question, str):
+        raise RuntimeError(
+            "Gemini returned an invalid follow-up question."
+        )
+
+    if not isinstance(reason, str):
+        raise RuntimeError(
+            "Gemini returned an invalid follow-up reason."
+        )
+
+    if should_ask and not follow_up_question.strip():
+        raise RuntimeError(
+            "Gemini decided to ask a follow-up but returned no question."
+        )
+
+    if not should_ask:
+        result["follow_up_question"] = ""
+
+    return result
+
+
+# --------------------------------------------------
+# 5. FINAL INTERVIEW REPORT
 # --------------------------------------------------
 
 REPORT_SCHEMA = {

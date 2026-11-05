@@ -542,6 +542,135 @@ lowest_score = min(scores)
 
 
 # ---------------------------------------------------------
+# COLLECT FOLLOW-UP QUESTIONS AND EVALUATIONS
+# ---------------------------------------------------------
+
+follow_up_records = []
+report_evaluations = []
+
+# Keep the main-question evaluations in the report.
+for index, evaluation in enumerate(evaluations):
+
+    report_evaluations.append({
+        **evaluation,
+        "question_type": "Main Interview Question",
+        "question_number": index + 1,
+        "question": questions[index].get("question", ""),
+        "answer": answers[index],
+    })
+
+
+# Collect each follow-up with its answer and evaluation.
+for index, question_item in enumerate(questions):
+
+    follow_up_questions = question_item.get(
+        "_follow_up_questions", []
+    )
+
+    follow_up_answers = question_item.get(
+        "_follow_up_answers", []
+    )
+
+    follow_up_evaluations = question_item.get(
+        "_follow_up_evaluations", []
+    )
+
+    total_for_question = max(
+        len(follow_up_questions),
+        len(follow_up_answers),
+        len(follow_up_evaluations),
+    )
+
+    for follow_index in range(total_for_question):
+
+        follow_up_item = (
+            follow_up_questions[follow_index]
+            if follow_index < len(follow_up_questions)
+            else {}
+        )
+
+        if not isinstance(follow_up_item, dict):
+            follow_up_item = {}
+
+        follow_up_evaluation = (
+            follow_up_evaluations[follow_index]
+            if follow_index < len(follow_up_evaluations)
+            else {}
+        )
+
+        if not isinstance(follow_up_evaluation, dict):
+            follow_up_evaluation = {}
+
+        follow_up_answer = (
+            follow_up_answers[follow_index]
+            if follow_index < len(follow_up_answers)
+            else ""
+        )
+
+        follow_up_score = follow_up_evaluation.get("score")
+
+        record = {
+            "main_question_number": index + 1,
+            "follow_up_number": follow_index + 1,
+            "question": follow_up_item.get("question", ""),
+            "answer": follow_up_answer,
+            "score": follow_up_score,
+            "feedback": follow_up_evaluation.get(
+                "feedback",
+                "No feedback available.",
+            ),
+            "strengths": follow_up_evaluation.get(
+                "strengths", []
+            ),
+            "improvements": follow_up_evaluation.get(
+                "improvements", []
+            ),
+            "ideal_answer": follow_up_evaluation.get(
+                "ideal_answer", ""
+            ),
+        }
+
+        follow_up_records.append(record)
+
+        # Only completed, valid follow-up evaluations
+        # are sent to Gemini.
+        if (
+            isinstance(follow_up_score, int)
+            and not isinstance(follow_up_score, bool)
+            and 0 <= follow_up_score <= 100
+        ):
+
+            report_evaluations.append({
+                **follow_up_evaluation,
+                "question_type": "Follow-up Question",
+                "main_question_number": index + 1,
+                "follow_up_number": follow_index + 1,
+                "question": record["question"],
+                "answer": follow_up_answer,
+            })
+
+
+completed_follow_up_scores = [
+    item["score"]
+    for item in follow_up_records
+    if (
+        isinstance(item["score"], int)
+        and not isinstance(item["score"], bool)
+        and 0 <= item["score"] <= 100
+    )
+]
+
+follow_up_average = (
+    round(
+        sum(completed_follow_up_scores)
+        / len(completed_follow_up_scores)
+    )
+    if completed_follow_up_scores
+    else None
+)
+
+
+# ---------------------------------------------------------
 # PERFORMANCE OVERVIEW
 # ---------------------------------------------------------
 
@@ -559,17 +688,17 @@ score_information = [
     (
         "OVERALL AVERAGE",
         average_score,
-        "Average score across all questions",
+        "Average score across all main questions",
     ),
     (
         "HIGHEST SCORE",
         highest_score,
-        "Your best individual answer",
+        "Your best individual main answer",
     ),
     (
         "LOWEST SCORE",
         lowest_score,
-        "Your lowest individual answer",
+        "Your lowest individual main answer",
     ),
 ]
 
@@ -588,6 +717,33 @@ for column, (label, value, caption) in zip(
             <div class="score-caption">{caption}</div>
         </div>
         """)
+
+
+# Follow-up performance summary.
+if follow_up_records:
+
+    st.markdown("**Follow-up Performance**")
+
+    follow_columns = st.columns(3)
+
+    follow_columns[0].metric(
+        "Follow-up Questions",
+        len(follow_up_records),
+    )
+
+    follow_columns[1].metric(
+        "Evaluated Follow-ups",
+        len(completed_follow_up_scores),
+    )
+
+    follow_columns[2].metric(
+        "Follow-up Average",
+        (
+            f"{follow_up_average}/100"
+            if follow_up_average is not None
+            else "Not available"
+        ),
+    )
 
 
 # ---------------------------------------------------------
@@ -680,17 +836,18 @@ for index, evaluation in enumerate(evaluations):
 
     score = evaluation.get("score", 0)
 
-    question_text = html.escape(
-        str(questions[index].get("question", "Question unavailable."))
-    )
-
     with st.expander(
         f"Question {index + 1}  |  Score: {score}/100"
     ):
 
         st.markdown("**Interview Question**")
 
-        st.write(questions[index].get("question", "Question unavailable."))
+        st.write(
+            questions[index].get(
+                "question",
+                "Question unavailable.",
+            )
+        )
 
         st.markdown("**Your Answer**")
 
@@ -739,6 +896,144 @@ for index, evaluation in enumerate(evaluations):
             )
         )
 
+        # ---------------------------------------------
+        # FOLLOW-UP DISCUSSION FOR THIS MAIN QUESTION
+        # ---------------------------------------------
+
+        question_follow_ups = questions[index].get(
+            "_follow_up_questions", []
+        )
+
+        question_follow_up_answers = questions[index].get(
+            "_follow_up_answers", []
+        )
+
+        question_follow_up_evaluations = questions[index].get(
+            "_follow_up_evaluations", []
+        )
+
+        if question_follow_ups:
+
+            st.divider()
+
+            st.markdown("### 🔄 Follow-up Discussion")
+
+            for follow_index, follow_item in enumerate(
+                question_follow_ups
+            ):
+
+                st.markdown(
+                    f"**Follow-up Question {follow_index + 1}**"
+                )
+
+                if isinstance(follow_item, dict):
+                    st.write(
+                        follow_item.get(
+                            "question",
+                            "Question unavailable.",
+                        )
+                    )
+                else:
+                    st.write(str(follow_item))
+
+                # Candidate's follow-up answer.
+                if follow_index < len(question_follow_up_answers):
+
+                    st.markdown("**Your Follow-up Answer**")
+
+                    st.write(
+                        question_follow_up_answers[follow_index]
+                    )
+
+                else:
+                    st.info(
+                        "No answer was recorded for this follow-up."
+                    )
+
+                # Follow-up evaluation.
+                if follow_index < len(question_follow_up_evaluations):
+
+                    follow_evaluation = (
+                        question_follow_up_evaluations[follow_index]
+                    )
+
+                    if isinstance(follow_evaluation, dict):
+
+                        follow_score = follow_evaluation.get("score")
+
+                        if (
+                            isinstance(follow_score, int)
+                            and not isinstance(follow_score, bool)
+                        ):
+
+                            st.metric(
+                                "Follow-up Score",
+                                f"{follow_score}/100",
+                            )
+
+                        else:
+                            st.caption(
+                                "Follow-up score is not available."
+                            )
+
+                        st.markdown("**Follow-up AI Feedback**")
+
+                        st.write(
+                            follow_evaluation.get(
+                                "feedback",
+                                "No feedback available.",
+                            )
+                        )
+
+                        # Follow-up strengths.
+                        st.markdown("**Strengths**")
+
+                        follow_strengths = follow_evaluation.get(
+                            "strengths", []
+                        )
+
+                        if follow_strengths:
+
+                            for item in follow_strengths:
+                                st.markdown(f"- {item}")
+
+                        else:
+                            st.caption("No strengths provided.")
+
+                        # Follow-up improvements.
+                        st.markdown("**Areas for Improvement**")
+
+                        follow_improvements = follow_evaluation.get(
+                            "improvements", []
+                        )
+
+                        if follow_improvements:
+
+                            for item in follow_improvements:
+                                st.markdown(f"- {item}")
+
+                        else:
+                            st.caption(
+                                "No improvement suggestions."
+                            )
+
+                        # Follow-up ideal answer.
+                        st.markdown(
+                            "**Example of a Stronger Answer**"
+                        )
+
+                        st.write(
+                            follow_evaluation.get(
+                                "ideal_answer",
+                                "No example answer available.",
+                            )
+                        )
+
+                else:
+                    st.info(
+                        "This follow-up has not been evaluated yet."
+                    )
+
 
 # ---------------------------------------------------------
 # GENERATE FINAL AI REPORT
@@ -755,15 +1050,23 @@ strengths, improvement areas, and recommendations.
 </div>
 """)
 
+# Regenerate older reports that did not include follow-up evaluations.
+if st.session_state.get("_final_report_version") != 2:
+
+    st.session_state.pop("final_report", None)
+
+    st.session_state["_final_report_version"] = 2
+
+
 if not st.session_state.get("final_report"):
 
     st.html("""
     <div class="light-panel">
         <div class="panel-title">Generate Your Personalized Report</div>
         <div class="panel-description">
-            Gemini will analyze all your interview evaluations
-            and prepare a final performance report with practical
-            recommendations.
+            Gemini will analyze your main interview answers and
+            completed follow-up answers to prepare a final performance
+            report with practical recommendations.
         </div>
     </div>
     """)
@@ -781,7 +1084,7 @@ if not st.session_state.get("final_report"):
             ):
 
                 report = generate_final_report(
-                    evaluations=evaluations,
+                    evaluations=report_evaluations,
                     job_role=st.session_state.get("job_role", ""),
                     interview_type=st.session_state.get(
                         "interview_type",
@@ -794,6 +1097,8 @@ if not st.session_state.get("final_report"):
                 )
 
             st.session_state["final_report"] = report
+
+            st.session_state["_final_report_version"] = 2
 
             st.success(
                 "Your final performance report is ready!"
@@ -837,6 +1142,7 @@ if report:
         or isinstance(report_score, bool)
         or not 0 <= report_score <= 100
     ):
+
         report_score = average_score
 
     safe_summary = html.escape(
@@ -884,8 +1190,10 @@ if report:
     strengths = report.get("strengths", [])
 
     if strengths:
+
         for item in strengths:
             st.markdown(f"- {item}")
+
     else:
         st.caption("No strengths provided.")
 
@@ -900,8 +1208,10 @@ if report:
     areas = report.get("areas_for_improvement", [])
 
     if areas:
+
         for item in areas:
             st.markdown(f"- {item}")
+
     else:
         st.caption("No improvement areas provided.")
 
@@ -916,22 +1226,38 @@ if report:
     recommendations = report.get("recommendations", [])
 
     if recommendations:
+
         for item in recommendations:
             st.markdown(f"- {item}")
+
     else:
         st.caption("No recommendations provided.")
 
-    # Prepare downloadable report.
+    # ---------------------------------------------
+    # DOWNLOADABLE REPORT
+    # ---------------------------------------------
 
     report_content = {
         "job_role": st.session_state.get("job_role"),
         "interview_type": st.session_state.get("interview_type"),
         "difficulty": st.session_state.get("difficulty"),
+
+        # Main question performance.
         "question_scores": scores,
         "average_score": average_score,
         "highest_score": highest_score,
         "lowest_score": lowest_score,
         "detailed_evaluations": evaluations,
+
+        # Follow-up performance.
+        "follow_up_question_count": len(follow_up_records),
+        "follow_up_average_score": follow_up_average,
+        "follow_up_details": follow_up_records,
+
+        # Combined evaluations sent to Gemini.
+        "all_question_evaluations": report_evaluations,
+
+        # Final AI report.
         "final_ai_report": report,
     }
 
@@ -947,7 +1273,7 @@ if report:
     <div class="light-panel">
         <div class="panel-title">⬇️ Download Your Interview Report</div>
         <div class="panel-description">
-            Keep a copy of your interview scores, individual
+            Keep a copy of your interview scores, follow-up
             evaluations, and final AI recommendations.
         </div>
     </div>
@@ -982,7 +1308,9 @@ if st.button(
     "← Return to Home",
     use_container_width=True,
 ):
+
     st.switch_page("app.py")
+
 
 st.caption(
     "Your interview results are maintained temporarily in "
